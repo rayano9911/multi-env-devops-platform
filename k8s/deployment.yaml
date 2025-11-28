@@ -18,7 +18,7 @@ spec:
         - name: ecr-registry
       containers:
       - name: multi-env-app
-        image: REPLACE_WITH_ECR_URI:latest
+        image: 284748446672.dkr.ecr.us-east-1.amazonaws.com/multi-env-dev:latest
         env:
         - name: ENVIRONMENT
           value: "dev"
