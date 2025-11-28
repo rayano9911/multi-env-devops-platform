@@ -44,7 +44,7 @@ jobs:
           REPO=${{ secrets.ECR_REPOSITORY }}
           ECR_URI="$ACCOUNT_ID.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com/$REPO"
           echo "ECR_URI=$ECR_URI" >> $GITHUB_ENV
-          echo "::set-output name=ECR_URI::$ECR_URI"
+          echo "ECR_URI=$ECR_URI" >> $GITHUB_OUTPUT
           aws ecr get-login-password --region ${{ secrets.AWS_REGION }} \
             | docker login --username AWS --password-stdin "$ACCOUNT_ID.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com"
 
