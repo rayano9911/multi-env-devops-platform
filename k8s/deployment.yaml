@@ -18,7 +18,7 @@ spec:
         - name: ecr-registry
       containers:
       - name: multi-env-app
-        image: REPLACE_WITH_ECR_URI:latest
+        image: REPLACE_WITH_ECR_URI
         env:
         - name: ENVIRONMENT
           value: "dev"
