@@ -18,7 +18,7 @@ spec:
         - name: ecr-registry
       containers:
       - name: multi-env-app
-        image: 284748446672.dkr.ecr.us-east-1.amazonaws.com/multi-env-dev:latest
+        image: "{{IMAGE_URI}}:{{IMAGE_TAG}}"  # هذا متغير ديناميكي
         env:
         - name: ENVIRONMENT
           value: "dev"
