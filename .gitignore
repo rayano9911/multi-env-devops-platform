@@ -1,0 +1,48 @@
+# Terraform files
+.terraform/
+.terraform.lock.hcl
+*.tfstate
+*.tfstate.*
+*.tfplan
+tfplan
+*.tfvars
+!terraform.tfvars
+.env
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# OS
+.AppleDouble
+.LSOverride
+._*
+
+# Logs
+*.log
+logs/
+
+# Local files
+local/
+.local/
+
+# Kubernetes
+kubeconfig
+kubeconfig-*
+*.kubeconfig
+
+# AWS
+.aws/credentials
+.aws/config
+
+# State backups
+backup.tfstate
+*.backup
+
+# Outputs
+*-outputs.json
+outputs.json
