@@ -3,17 +3,16 @@ name: CI/CD
 on:
   push:
     branches: [ main ]
+  pull_request:
+    branches: [ main ]
 
 permissions:
   contents: read
   id-token: write
 
 jobs:
-
   build-and-push:
     runs-on: ubuntu-latest
-    outputs:
-      ECR_URI: ${{ steps.ecr.outputs.ECR_URI }}
 
     steps:
       - name: Checkout
@@ -36,25 +35,24 @@ jobs:
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ secrets.AWS_REGION }}
 
-      - name: Login & Set ECR URI
-        id: ecr
+      - name: Login to ECR
         run: |
           ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
           REPO=${{ secrets.ECR_REPOSITORY }}
           ECR_URI="$ACCOUNT_ID.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com/$REPO"
-
           echo "ECR_URI=$ECR_URI" >> $GITHUB_ENV
-          echo "ECR_URI=$ECR_URI" >> $GITHUB_OUTPUT
-
           aws ecr get-login-password --region ${{ secrets.AWS_REGION }} \
             | docker login --username AWS --password-stdin "$ACCOUNT_ID.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com"
 
       - name: Build and push Docker image
+        env:
+          ECR_URI: ${{ env.ECR_URI }}
+          TAG: ${{ github.sha }}
         run: |
-          docker build -t $ECR_URI:latest ./app
-          docker tag $ECR_URI:latest $ECR_URI:${{ github.sha }}
-          docker push $ECR_URI:latest
-          docker push $ECR_URI:${{ github.sha }}
+          docker build -t "$ECR_URI:latest" ./app
+          docker tag "$ECR_URI:latest" "$ECR_URI:${TAG}"
+          docker push "$ECR_URI:latest"
+          docker push "$ECR_URI:${TAG}"
 
   deploy:
     needs: build-and-push
@@ -76,14 +74,8 @@ jobs:
         run: |
           aws eks update-kubeconfig --name ${{ secrets.EKS_CLUSTER_NAME }} --region ${{ secrets.AWS_REGION }}
 
-      - name: Debug ECR URI
-        run: |
-          echo "ECR_URI=${{ needs.build-and-push.outputs.ECR_URI }}"
-
       - name: Deploy to EKS
-        env:
-          ECR_URI: ${{ needs.build-and-push.outputs.ECR_URI }}
         run: |
-          sed -i "s|REPLACE_WITH_ECR_URI|$ECR_URI|g" k8s/deployment.yaml
+          sed -i "s|REPLACE_WITH_ECR_URI|${{ env.ECR_URI }}|g" k8s/deployment.yaml
           kubectl apply -f k8s/deployment.yaml
           kubectl apply -f k8s/service.yaml
