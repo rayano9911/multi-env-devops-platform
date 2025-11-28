@@ -45,14 +45,11 @@ jobs:
             | docker login --username AWS --password-stdin "$ACCOUNT_ID.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com"
 
       - name: Build and push Docker image
-        env:
-          ECR_URI: ${{ env.ECR_URI }}
-          TAG: ${{ github.sha }}
         run: |
-          docker build -t "$ECR_URI:latest" ./app
-          docker tag "$ECR_URI:latest" "$ECR_URI:${TAG}"
-          docker push "$ECR_URI:latest"
-          docker push "$ECR_URI:${TAG}"
+          docker build -t $ECR_URI:latest ./app
+          docker tag $ECR_URI:latest $ECR_URI:${{ github.sha }}
+          docker push $ECR_URI:latest
+          docker push $ECR_URI:${{ github.sha }}
 
   deploy:
     needs: build-and-push
@@ -75,9 +72,7 @@ jobs:
           aws eks update-kubeconfig --name ${{ secrets.EKS_CLUSTER_NAME }} --region ${{ secrets.AWS_REGION }}
 
       - name: Deploy to EKS
-        env:
-          ECR_URI: ${{ env.ECR_URI }}
         run: |
-          sed -i "s|REPLACE_WITH_ECR_URI|$ECR_URI|g" k8s/deployment.yaml
+          sed -i "s|REPLACE_WITH_ECR_URI|${{ env.ECR_URI }}|g" k8s/deployment.yaml
           kubectl apply -f k8s/deployment.yaml
           kubectl apply -f k8s/service.yaml
