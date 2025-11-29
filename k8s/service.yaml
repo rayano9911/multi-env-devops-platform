@@ -2,17 +2,11 @@ apiVersion: v1
 kind: Service
 metadata:
   name: multi-env-app-service
-#spec:
- # type: LoadBalancer
-  #selector:
-   # app: multi-env-app
-  #ports:
-   # - protocol: TCP
-    #  port: 80
-     # targetPort: 8080
 spec:
-  type: NodePort
+  type: LoadBalancer
+  selector:
+    app: multi-env-app
   ports:
-    - port: 80
-      targetPort: 8080
-      nodePort: 31227
+    - protocol: TCP
+      port: 80        # port للإنترنت
+      targetPort: 8080 # port داخل container
