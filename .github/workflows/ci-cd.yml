@@ -13,7 +13,9 @@ permissions:
 jobs:
   build-and-push:
     runs-on: ubuntu-latest
-
+    outputs:
+      ecr-uri: ${{ steps.set-ecr.outputs.ecr_uri }}
+    
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -35,7 +37,8 @@ jobs:
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ secrets.AWS_REGION }}
 
-      - name: Set ECR URI
+      - name: Set ECR URI and output
+        id: set-ecr
         run: |
           ACCOUNT_ID=${{ secrets.AWS_ACCOUNT_ID }}
           REGION=${{ secrets.AWS_REGION }}
@@ -44,8 +47,10 @@ jobs:
             echo "ERROR: Missing secrets!"
             exit 1
           fi
-          echo "ECR_URI=$ACCOUNT_ID.dkr.ecr.$REGION.amazonaws.com/$REPO" >> $GITHUB_ENV
-          echo "ECR_URI=$ACCOUNT_ID.dkr.ecr.$REGION.amazonaws.com/$REPO"
+          ECR_URI="$ACCOUNT_ID.dkr.ecr.$REGION.amazonaws.com/$REPO"
+          echo "ECR_URI=$ECR_URI" >> $GITHUB_ENV
+          echo "ecr_uri=$ECR_URI" >> $GITHUB_OUTPUT
+          echo "ECR_URI=$ECR_URI"
 
       - name: Login to ECR
         run: |
@@ -54,7 +59,7 @@ jobs:
 
       - name: Build and push Docker image
         run: |
-          IMAGE_TAG=$ECR_URI:${GITHUB_SHA}
+          IMAGE_TAG=${{ env.ECR_URI }}:${GITHUB_SHA}
           echo "Using image: $IMAGE_TAG"
           docker build -t $IMAGE_TAG ./app
           docker push $IMAGE_TAG
@@ -80,11 +85,7 @@ jobs:
 
       - name: Deploy to EKS
         run: |
-          if [ -z "$ECR_URI" ]; then
-            echo "ERROR: ECR_URI is empty!"
-            exit 1
-          fi
-          IMAGE_TAG=$ECR_URI:${GITHUB_SHA}
+          IMAGE_TAG=${{ needs.build-and-push.outputs.ecr-uri }}:${GITHUB_SHA}
           echo "Deploying image: $IMAGE_TAG"
           kubectl set image deployment/multi-env-app multi-env-app=$IMAGE_TAG --record
           kubectl rollout status deployment/multi-env-app
