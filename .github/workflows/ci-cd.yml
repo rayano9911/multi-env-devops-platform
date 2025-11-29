@@ -28,6 +28,7 @@ jobs:
         aws ecr get-login-password --region ${{ secrets.AWS_REGION }} \
         | docker login --username AWS --password-stdin \
           ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com
+        echo "✅ Docker login successful"
 
     - name: Build and Push Image
       id: build-image
@@ -38,10 +39,6 @@ jobs:
         docker build -t $IMAGE_TAG ./app
         docker push $IMAGE_TAG
         echo "Pushed image successfully!"
-    - name: Test AWS Credentials
-      run: |
-        aws sts get-caller-identity
-
 
   deploy:
     needs: build
@@ -64,8 +61,8 @@ jobs:
         IMAGE_TAG="${{ needs.build.outputs.image_tag }}"
         echo "Deploying: $IMAGE_TAG"
         if [ -z "$IMAGE_TAG" ]; then
-          echo "ERROR: IMAGE_TAG is empty"
+          echo "ERROR: IMAGE_TAG is empty. Build step failed or output not set."
           exit 1
         fi
         kubectl set image deployment/multi-env-app multi-env-app=$IMAGE_TAG
-        kubectl rollout status deployment/multi-env-app --timeout=60s
+        kubectl rollout status deployment/multi-env-app --timeout=5m
