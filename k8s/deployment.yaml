@@ -16,7 +16,7 @@ spec:
     spec:
       containers:
         - name: multi-env-app
-          image: REPLACE_WITH_ECR_URI
+          image: nginx:alpine  # صورة مؤقتة لحد ما ننشر صورتنا
           ports:
             - containerPort: 8080
           env:
@@ -33,7 +33,7 @@ spec:
             httpGet:
               path: /
               port: 8080
-            initialDelaySeconds: 10
+            initialDelaySeconds: 30
             periodSeconds: 10
           readinessProbe:
             httpGet:

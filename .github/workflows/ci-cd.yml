@@ -3,8 +3,6 @@ name: CI/CD
 on:
   push:
     branches: [ main ]
-  pull_request:
-    branches: [ main ]
 
 permissions:
   contents: read
@@ -35,36 +33,18 @@ jobs:
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ secrets.AWS_REGION }}
 
-      - name: Set ECR URI
-        id: set-ecr
-        run: |
-          ACCOUNT_ID="${{ secrets.AWS_ACCOUNT_ID }}"
-          REGION="${{ secrets.AWS_REGION }}"
-          REPO="${{ secrets.ECR_REPOSITORY }}"
-          
-          if [ -z "$ACCOUNT_ID" ] || [ -z "$REGION" ] || [ -z "$REPO" ]; then
-            echo "ERROR: Missing required secrets!"
-            echo "ACCOUNT_ID: ${#ACCOUNT_ID} chars"
-            echo "REGION: ${#REGION} chars" 
-            echo "REPO: ${#REPO} chars"
-            exit 1
-          fi
-          
-          ECR_URI="${ACCOUNT_ID}.dkr.ecr.${REGION}.amazonaws.com/${REPO}"
-          echo "ECR_URI=${ECR_URI}" >> $GITHUB_ENV
-          echo "Using ECR URI: ${ECR_URI}"
-
       - name: Login to ECR
         run: |
-          aws ecr get-login-password --region ${{ secrets.AWS_REGION }} \
-            | docker login --username AWS --password-stdin ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com
+          aws ecr get-login-password --region ${{ secrets.AWS_REGION }} | docker login --username AWS --password-stdin ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com
 
       - name: Build and push Docker image
         run: |
-          IMAGE_TAG="${{ env.ECR_URI }}:${GITHUB_SHA}"
+          ECR_URI="${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com/${{ secrets.ECR_REPOSITORY }}"
+          IMAGE_TAG="${ECR_URI}:${GITHUB_SHA}"
           echo "Building and pushing image: $IMAGE_TAG"
           docker build -t $IMAGE_TAG ./app
           docker push $IMAGE_TAG
+          echo "IMAGE_TAG=${IMAGE_TAG}" >> $GITHUB_ENV
 
   deploy:
     needs: build-and-push
@@ -82,27 +62,30 @@ jobs:
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ secrets.AWS_REGION }}
 
-      - name: Debug ECR URI
-        run: |
-          ACCOUNT_ID="${{ secrets.AWS_ACCOUNT_ID }}"
-          REGION="${{ secrets.AWS_REGION }}"
-          REPO="${{ secrets.ECR_REPOSITORY }}"
-          ECR_URI="${ACCOUNT_ID}.dkr.ecr.${REGION}.amazonaws.com/${REPO}"
-          echo "ECR_URI=${ECR_URI}"
-          echo "GITHUB_SHA=${GITHUB_SHA}"
-          echo "Full IMAGE_TAG=${ECR_URI}:${GITHUB_SHA}"
-
       - name: Update kubeconfig
         run: aws eks update-kubeconfig --name ${{ secrets.EKS_CLUSTER_NAME }} --region ${{ secrets.AWS_REGION }}
 
       - name: Deploy to EKS
         run: |
-          ACCOUNT_ID="${{ secrets.AWS_ACCOUNT_ID }}"
-          REGION="${{ secrets.AWS_REGION }}"
-          REPO="${{ secrets.ECR_REPOSITORY }}"
-          ECR_URI="${ACCOUNT_ID}.dkr.ecr.${REGION}.amazonaws.com/${REPO}"
+          ECR_URI="${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com/${{ secrets.ECR_REPOSITORY }}"
           IMAGE_TAG="${ECR_URI}:${GITHUB_SHA}"
           
           echo "Deploying image: $IMAGE_TAG"
-          kubectl set image deployment/multi-env-app multi-env-app="$IMAGE_TAG"
+          
+          # إذا الـ Deployment موجود، عدل الصورة
+          if kubectl get deployment multi-env-app > /dev/null 2>&1; then
+            echo "Updating existing deployment..."
+            kubectl set image deployment/multi-env-app multi-env-app="$IMAGE_TAG"
+          else
+            echo "Creating new deployment..."
+            # استبدل الصورة في ملف deployment.yaml
+            sed -i "s|nginx:alpine|$IMAGE_TAG|g" k8s/deployment.yaml
+            kubectl apply -f k8s/deployment.yaml
+          fi
+          
+          # تطبيق الـ Service (إذا مش موجود)
+          kubectl apply -f k8s/service.yaml
+          
+          # الانتظار حتى يكتمل النشر
           kubectl rollout status deployment/multi-env-app --timeout=300s
+          echo "Deployment completed successfully!"
