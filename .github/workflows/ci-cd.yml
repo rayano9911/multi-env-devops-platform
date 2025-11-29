@@ -37,7 +37,6 @@ jobs:
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ secrets.AWS_REGION }}
 
-      # ------------ FIX 1: Build ECR URI correctly ------------
       - name: Set ECR URI
         id: set-ecr-uri
         run: |
@@ -46,7 +45,6 @@ jobs:
           REPO=${{ secrets.ECR_REPOSITORY }}
           echo "ECR_URI=$ACCOUNT_ID.dkr.ecr.$REGION.amazonaws.com/$REPO" >> $GITHUB_OUTPUT
 
-      # ------------ FIX 2: Export variable so next steps see it ------------
       - name: Export ECR_URI
         run: echo "ECR_URI=${{ steps.set-ecr-uri.outputs.ECR_URI }}" >> $GITHUB_ENV
 
@@ -55,7 +53,6 @@ jobs:
           ACCOUNT_ID: ${{ secrets.AWS_ACCOUNT_ID }}
           REGION: ${{ secrets.AWS_REGION }}
         run: |
-          echo "Logging into ECR: $ACCOUNT_ID.dkr.ecr.$REGION.amazonaws.com"
           aws ecr get-login-password --region $REGION \
             | docker login --username AWS --password-stdin "$ACCOUNT_ID.dkr.ecr.$REGION.amazonaws.com"
 
