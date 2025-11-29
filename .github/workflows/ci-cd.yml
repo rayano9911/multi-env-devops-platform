@@ -35,15 +35,19 @@ jobs:
 
       - name: Login to ECR
         run: |
-          aws ecr get-login-password --region ${{ secrets.AWS_REGION }} | docker login --username AWS --password-stdin ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com
+          aws ecr get-login-password --region ${{ secrets.AWS_REGION }} \
+          | docker login --username AWS --password-stdin ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com
 
       - name: Build and push Docker image
         run: |
           IMAGE_TAG="${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com/${{ secrets.ECR_REPOSITORY }}:${GITHUB_SHA}"
           echo "Building image: $IMAGE_TAG"
-          docker build -t $IMAGE_TAG ./app
+
+          # Docker build مع مسار صحيح
+          docker build -t "$IMAGE_TAG" ./app
+
           echo "Pushing image..."
-          docker push $IMAGE_TAG
+          docker push "$IMAGE_TAG"
           echo "Image pushed successfully!"
 
   deploy:
@@ -69,5 +73,7 @@ jobs:
         run: |
           IMAGE_TAG="${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com/${{ secrets.ECR_REPOSITORY }}:${GITHUB_SHA}"
           echo "Deploying image: $IMAGE_TAG"
-          kubectl set image deployment/multi-env-app multi-env-app=$IMAGE_TAG --record
+
+          # Set image مع علامات اقتباس للتأكد
+          kubectl set image deployment/multi-env-app multi-env-app="$IMAGE_TAG" --record
           kubectl rollout status deployment/multi-env-app
