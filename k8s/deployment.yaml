@@ -2,8 +2,6 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: multi-env-app
-  labels:
-    app: multi-env-app
 spec:
   replicas: 2
   selector:
@@ -15,18 +13,10 @@ spec:
         app: multi-env-app
     spec:
       containers:
-        - name: multi-env-app
-          image: $IMAGE_TAG
-          ports:
-            - containerPort: 8080
-          env:
-            - name: ENVIRONMENT
-              value: dev
-          resources:
-            requests:
-              memory: "64Mi"
-              cpu: "100m"
-            limits:
-              memory: "128Mi"
-              cpu: "250m"
-              
+      - name: multi-env-app
+        image: placeholder:latest
+        ports:
+        - containerPort: 8080
+        env:
+        - name: ENVIRONMENT
+          value: dev
