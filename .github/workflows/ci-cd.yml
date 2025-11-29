@@ -39,12 +39,16 @@ jobs:
 
       - name: Build and push Docker image
         run: |
-          ECR_URI="${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com/${{ secrets.ECR_REPOSITORY }}"
-          IMAGE_TAG="${ECR_URI}:${GITHUB_SHA}"
-          echo "Building and pushing image: $IMAGE_TAG"
-          docker build -t $IMAGE_TAG ./app
+          # استخدم القيم مباشرة بدون متغيرات معقدة
+          IMAGE_TAG="${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com/${{ secrets.ECR_REPOSITORY }}:${GITHUB_SHA}"
+          echo "Building image: $IMAGE_TAG"
+          
+          # تأكد من مسار الـ build - استخدم المسار الصحيح للـ Dockerfile
+          docker build -t $IMAGE_TAG -f ./app/Dockerfile ./app
+          
+          echo "Pushing image..."
           docker push $IMAGE_TAG
-          echo "IMAGE_TAG=${IMAGE_TAG}" >> $GITHUB_ENV
+          echo "Image pushed successfully!"
 
   deploy:
     needs: build-and-push
@@ -67,8 +71,7 @@ jobs:
 
       - name: Deploy to EKS
         run: |
-          ECR_URI="${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com/${{ secrets.ECR_REPOSITORY }}"
-          IMAGE_TAG="${ECR_URI}:${GITHUB_SHA}"
+          IMAGE_TAG="${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com/${{ secrets.ECR_REPOSITORY }}:${GITHUB_SHA}"
           
           echo "Deploying image: $IMAGE_TAG"
           
@@ -78,14 +81,5 @@ jobs:
             kubectl set image deployment/multi-env-app multi-env-app="$IMAGE_TAG"
           else
             echo "Creating new deployment..."
-            # استبدل الصورة في ملف deployment.yaml
-            sed -i "s|nginx:alpine|$IMAGE_TAG|g" k8s/deployment.yaml
-            kubectl apply -f k8s/deployment.yaml
-          fi
-          
-          # تطبيق الـ Service (إذا مش موجود)
-          kubectl apply -f k8s/service.yaml
-          
-          # الانتظار حتى يكتمل النشر
-          kubectl rollout status deployment/multi-env-app --timeout=300s
-          echo "Deployment completed successfully!"
+            # أنشئ deployment جديد بالصورة الجديدة
+            cat <<EOF | kubectl apply -f -

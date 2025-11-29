@@ -16,7 +16,7 @@ spec:
     spec:
       containers:
         - name: multi-env-app
-          image: nginx:alpine  # صورة مؤقتة لحد ما ننشر صورتنا
+          image: $IMAGE_TAG
           ports:
             - containerPort: 8080
           env:
@@ -29,15 +29,4 @@ spec:
             limits:
               memory: "128Mi"
               cpu: "250m"
-          livenessProbe:
-            httpGet:
-              path: /
-              port: 8080
-            initialDelaySeconds: 30
-            periodSeconds: 10
-          readinessProbe:
-            httpGet:
-              path: /
-              port: 8080
-            initialDelaySeconds: 5
-            periodSeconds: 5
+              
