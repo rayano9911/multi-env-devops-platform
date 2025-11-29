@@ -3,6 +3,8 @@ name: CI/CD
 on:
   push:
     branches: [ main ]
+  pull_request:
+    branches: [ main ]
 
 permissions:
   contents: read
@@ -11,7 +13,7 @@ permissions:
 jobs:
   build-and-push:
     runs-on: ubuntu-latest
-    
+
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -25,7 +27,6 @@ jobs:
         run: |
           cd app
           npm ci
-
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v2
         with:
@@ -33,25 +34,25 @@ jobs:
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ secrets.AWS_REGION }}
 
+      - name: Set ECR URI
+        run: |
+          ACCOUNT_ID=${{ secrets.AWS_ACCOUNT_ID }}
+          REGION=${{ secrets.AWS_REGION }}
+          REPO=${{ secrets.ECR_REPOSITORY }}
+          echo "ECR_URI=$ACCOUNT_ID.dkr.ecr.$REGION.amazonaws.com/$REPO" >> $GITHUB_ENV
+          echo "ECR_URI=$ACCOUNT_ID.dkr.ecr.$REGION.amazonaws.com/$REPO"
       - name: Login to ECR
         run: |
           aws ecr get-login-password --region ${{ secrets.AWS_REGION }} \
-          | docker login --username AWS --password-stdin ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com
-
+            | docker login --username AWS --password-stdin ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com
       - name: Build and push Docker image
         run: |
-          IMAGE_TAG="${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com/${{ secrets.ECR_REPOSITORY }}:${GITHUB_SHA}"
-          echo "Building image: $IMAGE_TAG"
-
-          # Docker build مع مسار صحيح
-          docker build -t "$IMAGE_TAG" ./app
-
-          echo "Pushing image..."
-          docker push "$IMAGE_TAG"
-          echo "Image pushed successfully!"
-
+          echo "Using ECR: $ECR_URI"
+          docker build -t $ECR_URI:latest ./app
+          docker tag $ECR_URI:latest $ECR_URI:${{ github.sha }}
+          docker push $ECR_URI:latest
+          docker push $ECR_URI:${{ github.sha }}
   deploy:
-    needs: build-and-push
     runs-on: ubuntu-latest
     if: github.ref == 'refs/heads/main'
 
@@ -69,11 +70,17 @@ jobs:
       - name: Update kubeconfig
         run: aws eks update-kubeconfig --name ${{ secrets.EKS_CLUSTER_NAME }} --region ${{ secrets.AWS_REGION }}
 
+      - name: Set ECR URI
+        run: |
+          ACCOUNT_ID=${{ secrets.AWS_ACCOUNT_ID }}
+          REGION=${{ secrets.AWS_REGION }}
+          REPO=${{ secrets.ECR_REPOSITORY }}
+          echo "ECR_URI=$ACCOUNT_ID.dkr.ecr.$REGION.amazonaws.com/$REPO" >> $GITHUB_ENV
+          echo "ECR_URI=$ACCOUNT_ID.dkr.ecr.$REGION.amazonaws.com/$REPO"
       - name: Deploy to EKS
         run: |
-          IMAGE_TAG="${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com/${{ secrets.ECR_REPOSITORY }}:${GITHUB_SHA}"
-          echo "Deploying image: $IMAGE_TAG"
-
-          # Set image مع علامات اقتباس للتأكد
-          kubectl set image deployment/multi-env-app multi-env-app="$IMAGE_TAG" --record
+          echo "Deploying image: $ECR_URI"
+          sed -i "s|REPLACE_WITH_ECR_URI|$ECR_URI|g" k8s/deployment.yaml
+          kubectl apply -f k8s/deployment.yaml
           kubectl rollout status deployment/multi-env-app
+          kubectl apply -f k8s/service.yaml
