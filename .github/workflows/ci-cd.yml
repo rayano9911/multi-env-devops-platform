@@ -41,7 +41,6 @@ jobs:
           REGION=${{ secrets.AWS_REGION }}
           REPO=${{ secrets.ECR_REPOSITORY }}
           echo "ECR_URI=$ACCOUNT_ID.dkr.ecr.$REGION.amazonaws.com/$REPO" >> $GITHUB_ENV
-          echo "ECR_URI=$ACCOUNT_ID.dkr.ecr.$REGION.amazonaws.com/$REPO"
 
       - name: Login to ECR
         run: |
@@ -51,12 +50,11 @@ jobs:
       - name: Build and push Docker image
         run: |
           echo "Using ECR: $ECR_URI"
-          docker build -t $ECR_URI:latest ./app
-          docker tag $ECR_URI:latest $ECR_URI:${{ github.sha }}
-          docker push $ECR_URI:latest
-          docker push $ECR_URI:${{ github.sha }}
+          docker build -t $ECR_URI:${GITHUB_SHA} ./app
+          docker push $ECR_URI:${GITHUB_SHA}
 
   deploy:
+    needs: build-and-push
     runs-on: ubuntu-latest
     if: github.ref == 'refs/heads/main'
 
@@ -74,18 +72,11 @@ jobs:
       - name: Update kubeconfig
         run: aws eks update-kubeconfig --name ${{ secrets.EKS_CLUSTER_NAME }} --region ${{ secrets.AWS_REGION }}
 
-      - name: Set ECR URI
-        run: |
-          ACCOUNT_ID=${{ secrets.AWS_ACCOUNT_ID }}
-          REGION=${{ secrets.AWS_REGION }}
-          REPO=${{ secrets.ECR_REPOSITORY }}
-          echo "ECR_URI=$ACCOUNT_ID.dkr.ecr.$REGION.amazonaws.com/$REPO" >> $GITHUB_ENV
-          echo "ECR_URI=$ACCOUNT_ID.dkr.ecr.$REGION.amazonaws.com/$REPO"
-
       - name: Deploy to EKS
         run: |
-          echo "Deploying image: $ECR_URI"
-          sed -i "s|REPLACE_WITH_ECR_URI|$ECR_URI|g" k8s/deployment.yaml
+          IMAGE_TAG=$ECR_URI:${GITHUB_SHA}
+          echo "Deploying image: $IMAGE_TAG"
+          sed -i "s|REPLACE_WITH_ECR_URI|$IMAGE_TAG|g" k8s/deployment.yaml
           kubectl apply -f k8s/deployment.yaml
           kubectl rollout status deployment/multi-env-app
           kubectl apply -f k8s/service.yaml

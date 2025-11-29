@@ -16,7 +16,7 @@ spec:
     spec:
       containers:
         - name: multi-env-app
-          image: REPLACE_WITH_ECR_URI:latest
+          image: REPLACE_WITH_ECR_URI
           ports:
             - containerPort: 8080
           env:
