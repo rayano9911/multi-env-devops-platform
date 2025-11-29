@@ -41,6 +41,7 @@ jobs:
           REGION=${{ secrets.AWS_REGION }}
           REPO=${{ secrets.ECR_REPOSITORY }}
           echo "ECR_URI=$ACCOUNT_ID.dkr.ecr.$REGION.amazonaws.com/$REPO" >> $GITHUB_ENV
+          echo "ECR_URI=$ACCOUNT_ID.dkr.ecr.$REGION.amazonaws.com/$REPO"
 
       - name: Login to ECR
         run: |
@@ -49,9 +50,10 @@ jobs:
 
       - name: Build and push Docker image
         run: |
-          echo "Using ECR: $ECR_URI"
-          docker build -t $ECR_URI:${GITHUB_SHA} ./app
-          docker push $ECR_URI:${GITHUB_SHA}
+          IMAGE_TAG=$ECR_URI:${GITHUB_SHA}
+          echo "Using image: $IMAGE_TAG"
+          docker build -t $IMAGE_TAG ./app
+          docker push $IMAGE_TAG
 
   deploy:
     needs: build-and-push
