@@ -39,13 +39,9 @@ jobs:
 
       - name: Build and push Docker image
         run: |
-          # استخدم القيم مباشرة بدون متغيرات معقدة
           IMAGE_TAG="${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com/${{ secrets.ECR_REPOSITORY }}:${GITHUB_SHA}"
           echo "Building image: $IMAGE_TAG"
-          
-          # تأكد من مسار الـ build - استخدم المسار الصحيح للـ Dockerfile
-          docker build -t $IMAGE_TAG -f ./app/Dockerfile ./app
-          
+          docker build -t $IMAGE_TAG ./app
           echo "Pushing image..."
           docker push $IMAGE_TAG
           echo "Image pushed successfully!"
@@ -72,14 +68,6 @@ jobs:
       - name: Deploy to EKS
         run: |
           IMAGE_TAG="${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com/${{ secrets.ECR_REPOSITORY }}:${GITHUB_SHA}"
-          
           echo "Deploying image: $IMAGE_TAG"
-          
-          # إذا الـ Deployment موجود، عدل الصورة
-          if kubectl get deployment multi-env-app > /dev/null 2>&1; then
-            echo "Updating existing deployment..."
-            kubectl set image deployment/multi-env-app multi-env-app="$IMAGE_TAG"
-          else
-            echo "Creating new deployment..."
-            # أنشئ deployment جديد بالصورة الجديدة
-            cat <<EOF | kubectl apply -f -
+          kubectl set image deployment/multi-env-app multi-env-app=$IMAGE_TAG --record
+          kubectl rollout status deployment/multi-env-app
