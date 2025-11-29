@@ -38,6 +38,9 @@ jobs:
         docker build -t $IMAGE_TAG ./app
         docker push $IMAGE_TAG
         echo "Pushed image successfully!"
+    - name: Test AWS Credentials
+      run: |
+        aws sts get-caller-identity
 
 
   deploy:
