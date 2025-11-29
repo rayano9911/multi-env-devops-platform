@@ -14,10 +14,10 @@ jobs:
   build-and-push:
     runs-on: ubuntu-latest
     outputs:
-      ECR_URI: ${{ steps.login-ecr.outputs.ECR_URI }}
+      ECR_URI: ${{ steps.set-ecr-uri.outputs.ECR_URI }}
 
     steps:
-      - name: Checkout code
+      - name: Checkout
         uses: actions/checkout@v4
 
       - name: Setup Node.js
@@ -37,16 +37,20 @@ jobs:
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ secrets.AWS_REGION }}
 
-      - name: Login to ECR
-        id: login-ecr
+      - name: Set ECR URI
+        id: set-ecr-uri
         run: |
-          ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
-          REPO=${{ secrets.ECR_REPOSITORY }}
+          ACCOUNT_ID=${{ secrets.AWS_ACCOUNT_ID }}
           REGION=${{ secrets.AWS_REGION }}
+          REPO=${{ secrets.ECR_REPOSITORY }}
           ECR_URI="$ACCOUNT_ID.dkr.ecr.$REGION.amazonaws.com/$REPO"
           echo "ECR_URI=$ECR_URI" >> $GITHUB_ENV
           echo "ECR_URI=$ECR_URI" >> $GITHUB_OUTPUT
-          aws ecr get-login-password --region $REGION | docker login --username AWS --password-stdin "$ACCOUNT_ID.dkr.ecr.$REGION.amazonaws.com"
+
+      - name: Login to ECR
+        run: |
+          aws ecr get-login-password --region ${{ secrets.AWS_REGION }} \
+            | docker login --username AWS --password-stdin "$ACCOUNT_ID.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com"
 
       - name: Build and push Docker image
         run: |
@@ -61,7 +65,7 @@ jobs:
     if: github.ref == 'refs/heads/main'
 
     steps:
-      - name: Checkout code
+      - name: Checkout
         uses: actions/checkout@v4
 
       - name: Configure AWS credentials
@@ -72,15 +76,13 @@ jobs:
           aws-region: ${{ secrets.AWS_REGION }}
 
       - name: Update kubeconfig
-        run: |
-          aws eks update-kubeconfig --name ${{ secrets.EKS_CLUSTER_NAME }} --region ${{ secrets.AWS_REGION }}
+        run: aws eks update-kubeconfig --name ${{ secrets.EKS_CLUSTER_NAME }} --region ${{ secrets.AWS_REGION }}
 
       - name: Deploy to EKS
         env:
           ECR_URI: ${{ needs.build-and-push.outputs.ECR_URI }}
         run: |
-          # استبدال الصورة ديناميكيًا
           sed -i "s|REPLACE_WITH_ECR_URI|$ECR_URI|g" k8s/deployment.yaml
           kubectl apply -f k8s/deployment.yaml
-          kubectl apply -f k8s/service.yaml
           kubectl rollout status deployment/multi-env-app
+          kubectl apply -f k8s/service.yaml
