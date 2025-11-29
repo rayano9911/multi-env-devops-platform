@@ -4,7 +4,7 @@ const port = process.env.PORT || 8080;
 
 app.get('/', (req, res) => {
   res.json({
-    message: 'Hello from Multi-Env DevOps Platform *rayaaan*',
+    message: 'Hello from Multi-Env DevOps Platform rayaaan*',
     environment: process.env.ENVIRONMENT || 'dev',
     version: '0.1.0'
   });
