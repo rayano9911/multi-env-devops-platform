@@ -47,6 +47,14 @@ jobs:
           echo "ECR_URI=$ECR_URI" >> $GITHUB_OUTPUT
           echo "ECR_URI=$ECR_URI" >> $GITHUB_ENV
 
+      - name: Verify ECR_URI
+        run: |
+          echo "ECR_URI=$ECR_URI"
+          if [ -z "$ECR_URI" ]; then
+            echo "ECR_URI is empty! Failing the job."
+            exit 1
+          fi
+
       - name: Login to ECR
         run: |
           aws ecr get-login-password --region ${{ secrets.AWS_REGION }} \
@@ -81,6 +89,14 @@ jobs:
 
       - name: Update kubeconfig
         run: aws eks update-kubeconfig --name ${{ secrets.EKS_CLUSTER_NAME }} --region ${{ secrets.AWS_REGION }}
+
+      - name: Verify ECR_URI in deploy
+        run: |
+          echo "ECR_URI=$ECR_URI"
+          if [ -z "$ECR_URI" ]; then
+            echo "ECR_URI is empty in deploy job! Failing."
+            exit 1
+          fi
 
       - name: Deploy to EKS
         run: |
